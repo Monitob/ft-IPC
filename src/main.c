@@ -6,7 +6,7 @@
 /*   By: jbernabe <jbernabe@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2014/05/28 20:38:57 by jbernabe          #+#    #+#             */
-/*   Updated: 2014/05/31 20:49:48 by jbernabe         ###   ########.fr       */
+/*   Updated: 2014/05/31 22:44:34 by jbernabe         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -90,26 +90,22 @@ int					init_share_memory(char *path, t_player **p, t_env **arena)
 	return ((*p)->key_seg);
 }
 
-void			ft_close_sem(int sem_id)
+void			ft_close_sem(t_player *p, int id)
 {
-	struct sembuf sb;
-
-	sb.sem_num = 0;
-	sb.sem_op = -1;
-	sb.sem_flg = 0;
-	if ((semop(sem_id, &sb, 2)) == -1)
+	p->sb[0].sem_num = id;
+	p->sb[0].sem_op = -1;
+	p->sb[0].sem_flg = SEM_UNDO;
+	if ((semop(p->sb_id, p->sb, 2)) == -1)
 		ft_putstr_fd("close sem () fail\n", 2);
 }
 
-void			ft_open_sem(int sem_id)
+void			ft_open_sem(t_player *p, int id)
 {
-	struct sembuf sb;
-
-	sb.sem_num = 0;
-	sb.sem_op = 1;
-	sb.sem_flg = 0;
-	if (semop(sem_id, &sb, 2) == -1)
-		ft_putstr_fd("open sem () fail\n", 2);
+	p->sb[0].sem_num = id;
+	p->sb[0].sem_op = 1;
+	p->sb[0].sem_flg = SEM_UNDO;
+	if ((semop(p->sb_id, p->sb, 2)) == -1)
+		ft_putstr_fd("close sem () fail\n", 2);
 }	
 
 void			ft_print(t_env *arena)
@@ -154,10 +150,43 @@ void 			ft_game(t_player *p, t_env *e, char *id_player)
 	}
 }
 
+void			ft_move_player(t_player *p, t_env *e)
+{
+	int			i;
+	int			j;
+
+	i = 0;
+	while (i < HEIGHT)
+	{
+		j = 0;
+		while (j < WIDTH)
+		{
+			if (e->map[i][j] == p->team_nb)
+			{
+				e->map[p->y + 1][p->x + 1] = 0;
+				e->map[p->y + 2][p->x + 2] = 0;
+				e->map[p->y][p->x] = 0;
+				e->map[p->y + 2][p->x + 2] = p->team_nb;
+				e->map[p->y + 3][p->x + 3] = p->team_nb;
+				break ;
+			}
+			j++;
+		}
+		printf("\n");
+		i++;
+	}
+}
+
 void			ft_play_game(t_player *p, t_env *e)
 {
-ft_close_sem(player->sb_id);
-	ft_open_sem(player->sb_id);
+	while (1)
+	{
+		ft_close_sem(p, READ);
+		ft_close_sem(p, WRITE);
+		ft_move_player(p, e);
+		ft_open_sem(p, WRITE);
+		ft_open_sem(p, READ);
+	}
 }
 
 int				main(int ac, char **av)
@@ -180,6 +209,7 @@ int				main(int ac, char **av)
 	}
 	player->team_nb = ft_atoi(av[1]);
 	ft_game(player, arena, av[1]);
+		ft_play_game(player, arena);
 	ft_print(arena);
 	
 	return (0);

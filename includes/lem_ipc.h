@@ -6,7 +6,7 @@
 /*   By: jbernabe <jbernabe@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2014/05/29 02:49:48 by jbernabe          #+#    #+#             */
-/*   Updated: 2014/05/31 20:06:08 by jbernabe         ###   ########.fr       */
+/*   Updated: 2014/05/31 22:25:11 by jbernabe         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,11 @@
 # include <sys/shm.h>
 # include <sys/sem.h>
 # include <sys/stat.h>
+# include <time.h>
 # include "libft.h"
 
+# define	READ 	1
+# define	WRITE	2
 # define	WIDTH	20
 # define	HEIGHT	20
 
@@ -40,8 +43,6 @@ typedef struct	s_player
 	struct sembuf sb[2];
 }				t_player;
 
-void			ft_close_sem(int sem_id);
-void			ft_open_sem(int sem_id);
 void			creat_sb(t_player **player, t_env **arena);
 int				init_share_memory(char *path, t_player **p, t_env **arena);
 #endif
