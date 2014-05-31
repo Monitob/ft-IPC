@@ -6,79 +6,91 @@
 /*   By: jbernabe <jbernabe@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2014/05/28 20:38:57 by jbernabe          #+#    #+#             */
-/*   Updated: 2014/05/29 05:52:14 by jbernabe         ###   ########.fr       */
+/*   Updated: 2014/05/31 03:40:29 by jbernabe         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <sys/shm.h>
-#include <sys/stat.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include "lem_ipc.h"
 
-int				**ft_init_matrix(int len_matrix)
+int					init_share_memory(char *path, t_player **p, t_env **arena)
 {
-	int 	**matrix;
-	int		i;
-	int		j;
+	int				seg_id;
+	int				map_id;
+	key_t			key;
 
-	i = 0;
-	if (!(matrix = (int **)malloc(sizeof(int *) * len_matrix + 2)))
-		return (0);
-	while (i < len_matrix + 1)
+	if ((key = ftok("./auteur", 'm')) == -1)
+		return (-1);
+	if ((seg_id = shmget(key, sizeof(t_env), SHM_R | SHM_W)) < 0)
 	{
-		if (!(matrix[i] = (int *)malloc(sizeof(int) * len_matrix + 2)))
-			return (0);
-		j = 0;
-		while (j < len_matrix)
+		if ((seg_id = shmget(key, sizeof(t_env), IPC_CREAT | SHM_R | SHM_W)) < 0)
 		{
-			matrix[i][j] = 0;
-			j++;
+			ft_putstr_fd("shmeget() map fail\n", 2);
+			exit (-1);
 		}
-		matrix[i][j] = -1;
-		i++;
-	}	
-	matrix[len_matrix] = NULL;
-	return (matrix);
-}
-
-void				init_share_memory(t_ipc *game)
-{
-	char			*share_memory;
-	struct shmid_ds	shmbuffer;
-	const int 		size_memo_share = sizeof(game);
-/*allocate a shared memory segment */
-	if ((game->segment_id = shmget(IPC_PRIVATE, size_memo_share,
-						IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR)) < 0)
+	}
+	if (!(*arena = (t_env *)shmat(seg_id, NULL, SHM_R | SHM_W)))
 	{
-		printf("segment id fail\n");
+		printf("shmat() attachement map fail\n");
 		exit(-1);
 	}
-	printf("%d **** this is segment_id\n", game->segment_id);
-	if ((share_memory = (char *)shmat(game->segment_id, 0, 0)) == (char *)-1)
+	if (!(*p = (t_player *)malloc(sizeof(t_player))))
+		return (-1);
+	(*p)->key_seg = key;
+	return (seg_id);
+}
+
+void			creat_sb_write(t_player **player, t_env **arena)
+{
+	int		sb_id;
+
+	if ((sb_id = semget((*player)->key_seg, 0, SETVAL)) < 0)
 	{
-		printf("shmat() fail\n");
-		exit(-2);
+		sb_id = semget((*player)->key_seg, 1, IPC_CREAT | IPC_EXCL | 0666);
+		if (sb_id < 0)
+		{
+			ft_putstr_fd("error creat sb_id", 2);
+			exit(-1);
+		}
+		if (semctl(sb_id, 0, SETVAL, 1) < 0 )
+		{
+			ft_putstr_fd("error init sb", 2);
+			exit (-2);
+		}
 	}
-	printf("share memory %d\n",share_memory[0]++);
 }
 
-t_ipc			*init_map(t_ipc *game)
+void			creat_sb_read(t_player **player, t_env **arena)
 {
-	if (!(game = (t_ipc *)malloc(sizeof(t_ipc))))
-		return (NULL);
-	game->table = ft_init_matrix(100);
-	return (game);
+	int		sb_id;
+
+	if ((sb_id = semget((*player)->key_seg, 1, GETVAL)) < 0)
+	{
+		sb_id = semget((*player)->key_seg, 1, IPC_CREAT | IPC_EXCL | 0666);
+		if (sb_id < 0)
+		{
+			ft_putstr_fd("error creat sb_id", 2);
+			exit(-1);
+		}
+		if (semctl(sb_id, 0, SETVAL, 1) < 0 )
+		{
+			ft_putstr_fd("error init sb", 2);
+			exit (-2);
+		}
+	}
 }
 
-int				main(void)
+int				main(int ac, char **av)
 {
-	t_ipc		*court;
+	t_player		*player;
+	t_env			*arena;
 
-	court = init_map(court);
-	init_share_memory(court);
+	if (ac != 2)
+		return (-1);
+	player->seg_id = init_share_memory(av[0], &player, &arena);
+	creat_sb_read(&player, &arena);
+	creat_sb_write(&player, &arena);
+	
+
 	return (0);
 }
