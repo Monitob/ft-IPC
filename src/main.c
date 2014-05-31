@@ -6,78 +6,158 @@
 /*   By: jbernabe <jbernabe@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2014/05/28 20:38:57 by jbernabe          #+#    #+#             */
-/*   Updated: 2014/05/31 03:40:29 by jbernabe         ###   ########.fr       */
+/*   Updated: 2014/05/31 20:49:48 by jbernabe         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <unistd.h>
 #include "lem_ipc.h"
 
+int 				make_semf(key_t key, int n)
+{
+	union semun		arg;
+	int 			sb_id;
+	int 			i;
+
+	if ((sb_id = semget(key, n, IPC_CREAT | IPC_EXCL | 0666)) < 0)
+	{
+		semctl(sb_id, 0, IPC_RMID);
+		if ((sb_id = semget(key, n, IPC_CREAT | 0666)) != -1)
+		{
+			arg.val = 1;
+			i = 0;
+			while (i < n)
+			{
+				semctl(sb_id, 0, SETVAL, arg);
+				i++;
+			}
+		}
+	}
+	printf("sb_id %d\n", sb_id);
+	return (sb_id);
+}
+		
+void				ft_shm_zero(t_env **arena)
+{
+	int 		i;
+	int 		j;
+
+	i = 0;
+	while (i < HEIGHT)
+	{
+		j = 0;
+		while (j < HEIGHT)
+		{
+			(*arena)->map[i][j] = 0;
+			j++;
+		}
+		i++;
+	}
+}
+
 int					init_share_memory(char *path, t_player **p, t_env **arena)
 {
-	int				seg_id;
-	int				map_id;
-	key_t			key;
+	int	flags;
+	int flags2;
 
-	if ((key = ftok("./auteur", 'm')) == -1)
+	flags = SHM_R | SHM_W;
+	flags2 = IPC_CREAT | SHM_R | SHM_W;
+	if (((*p)->key_seg = ftok(path	, 0)) == -1)
 		return (-1);
-	if ((seg_id = shmget(key, sizeof(t_env), SHM_R | SHM_W)) < 0)
+	ft_putstr("ftok -> ");
+	ft_putnbr((*p)->key_seg);
+	ft_putchar('\n');
+	if (((*p)->seg_id = shmget((*p)->key_seg, sizeof(t_env), flags)) <= 0)
 	{
-		if ((seg_id = shmget(key, sizeof(t_env), IPC_CREAT | SHM_R | SHM_W)) < 0)
+		if (((*p)->seg_id = shmget((*p)->key_seg, sizeof(t_env), flags2)) == -1)
 		{
-			ft_putstr_fd("shmeget() map fail\n", 2);
-			exit (-1);
+			ft_putstr_fd("error init share memory()\n", 2);
+			return (-1);
 		}
+		if (!(*arena = (t_env *)shmat((*p)->seg_id, (void *)0, SHM_R | SHM_W)))
+		{
+			printf("shmat() attachement map fail\n");
+			return (-1);
+		}
+		ft_shm_zero(arena);
+		return ((*p)->key_seg);
 	}
-	if (!(*arena = (t_env *)shmat(seg_id, NULL, SHM_R | SHM_W)))
+	if (!(*arena = (t_env *)shmat((*p)->seg_id, (void *)0, SHM_R | SHM_W)))
 	{
 		printf("shmat() attachement map fail\n");
-		exit(-1);
-	}
-	if (!(*p = (t_player *)malloc(sizeof(t_player))))
 		return (-1);
-	(*p)->key_seg = key;
-	return (seg_id);
+	}
+	return ((*p)->key_seg);
 }
 
-void			creat_sb_write(t_player **player, t_env **arena)
+void			ft_close_sem(int sem_id)
 {
-	int		sb_id;
+	struct sembuf sb;
 
-	if ((sb_id = semget((*player)->key_seg, 0, SETVAL)) < 0)
+	sb.sem_num = 0;
+	sb.sem_op = -1;
+	sb.sem_flg = 0;
+	if ((semop(sem_id, &sb, 2)) == -1)
+		ft_putstr_fd("close sem () fail\n", 2);
+}
+
+void			ft_open_sem(int sem_id)
+{
+	struct sembuf sb;
+
+	sb.sem_num = 0;
+	sb.sem_op = 1;
+	sb.sem_flg = 0;
+	if (semop(sem_id, &sb, 2) == -1)
+		ft_putstr_fd("open sem () fail\n", 2);
+}	
+
+void			ft_print(t_env *arena)
+{
+	int			i;
+	int			j;
+
+	i = 0;
+	while (i < HEIGHT)
 	{
-		sb_id = semget((*player)->key_seg, 1, IPC_CREAT | IPC_EXCL | 0666);
-		if (sb_id < 0)
+		j = 0;
+		while (j < WIDTH)
 		{
-			ft_putstr_fd("error creat sb_id", 2);
-			exit(-1);
+			printf(" %d", arena->map[i][j]);
+			j++;
 		}
-		if (semctl(sb_id, 0, SETVAL, 1) < 0 )
-		{
-			ft_putstr_fd("error init sb", 2);
-			exit (-2);
-		}
+		printf("\n");
+		i++;
 	}
 }
 
-void			creat_sb_read(t_player **player, t_env **arena)
+void 			ft_game(t_player *p, t_env *e, char *id_player)
 {
-	int		sb_id;
+	srand(time(NULL));
+	printf("%s\n", id_player);
 
-	if ((sb_id = semget((*player)->key_seg, 1, GETVAL)) < 0)
+	while (1)
 	{
-		sb_id = semget((*player)->key_seg, 1, IPC_CREAT | IPC_EXCL | 0666);
-		if (sb_id < 0)
-		{
-			ft_putstr_fd("error creat sb_id", 2);
-			exit(-1);
-		}
-		if (semctl(sb_id, 0, SETVAL, 1) < 0 )
-		{
-			ft_putstr_fd("error init sb", 2);
-			exit (-2);
-		}
+		p->x = rand() % WIDTH;
+		p->y = rand() % HEIGHT;
+		printf("case test -%c- de coord %d %d\n", e->map[p->y][p->x], p->y, p->x);
+		if (e->map[p->y][p->x] != ft_atoi(id_player))
+		 	break;
 	}
+	
+	if (e->map[p->y][p->x] == 0 && e->map[p->y + 1][p->x + 1] == 0 && 
+		e->map[p->y + 2][p->x + 2] == 0)
+	{
+		e->map[p->y][p->x] = p->team_nb;
+		e->map[p->y + 1][p->x + 1] = p->team_nb;
+		e->map[p->y + 2][p->x + 2] = p->team_nb;
+	}
+}
+
+void			ft_play_game(t_player *p, t_env *e)
+{
+ft_close_sem(player->sb_id);
+	ft_open_sem(player->sb_id);
 }
 
 int				main(int ac, char **av)
@@ -87,10 +167,20 @@ int				main(int ac, char **av)
 
 	if (ac != 2)
 		return (-1);
-	player->seg_id = init_share_memory(av[0], &player, &arena);
-	creat_sb_read(&player, &arena);
-	creat_sb_write(&player, &arena);
+	if (!(player = (t_player *)malloc(sizeof(t_player))))
+		return (-1);
+	player->key_seg = init_share_memory(av[0], &player, &arena);
+	printf("playe key %d\n", player->key_seg);
+	player->sb_id = make_semf(player->key_seg, 2);
+	printf("semafore id %d\n", player->sb_id);
+	if (player->sb_id < 0)
+	{
+		ft_putstr_fd("semget() fail\n", 2);
+		exit (-1);
+	}
+	player->team_nb = ft_atoi(av[1]);
+	ft_game(player, arena, av[1]);
+	ft_print(arena);
 	
-
 	return (0);
 }
