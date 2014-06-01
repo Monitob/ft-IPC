@@ -6,7 +6,7 @@
 #    By: jbernabe <jbernabe@student.42.fr>          +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2014/02/04 22:30:52 by jbernabe          #+#    #+#              #
-#    Updated: 2014/05/31 12:04:43 by jbernabe         ###   ########.fr        #
+#    Updated: 2014/06/01 21:22:05 by jbernabe         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -14,14 +14,13 @@ CC = gcc
 
 NAME = lemipc
 
-CFLAGS = -g --debug -I libft/  -L ./libft/
-#-Wall -Wextra -Werror 
+CFLAGS = -I libft/  -L ./libft/ -Wall -Wextra -Werror 
 
 PATH_SRC = ./src
 PATH_OBJ = ./objs
 PATH_INC = ./includes
 
-SRC = main.c
+SRC = main.c game.c test_fct.c players.c go_to.c
 
 OBJ = $(patsubst %.c, $(PATH_OBJ)/%.o, $(SRC))
 
